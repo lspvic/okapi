@@ -1,0 +1,6 @@
+flask
+flask_sqlalchemy
+PyMySQL
+flask_oauthlib
+docker
+uwsgi

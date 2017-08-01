@@ -1,0 +1,30 @@
+version: '3'
+services:
+    engine:
+        build: .
+        ports:
+            - "5001:5000"
+        links:
+            - mysql
+        environment:
+            - okapi_config=okapi.config.RemoteDevConfig
+        volumes:
+            - log-data:/var/log/
+            - db-data:/var/lib/okapi/binary/
+            - /var/run/docker.sock:/var/run/docker.sock
+    
+    mysql:
+        image: mysql
+        command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
+        volumes:
+            - db-data:/var/lib/mysql
+        environment:
+            - MYSQL_ONETIME_PASSWORD=yes
+            - MYSQL_RANDOM_ROOT_PASSWORD=yes
+            - MYSQL_USER=okapi
+            - MYSQL_PASSWORD=43%xdR+g
+            - MYSQL_DATABASE=okapi
+
+volumes:
+    db-data: {}
+    log-data: {}

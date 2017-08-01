@@ -1,0 +1,7 @@
+*.md
+.gitlab-ci.yml
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+runtime
