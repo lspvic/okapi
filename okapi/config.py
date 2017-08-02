@@ -18,7 +18,7 @@ class RemoteDevConfig(Config):
     #SERVER_NAME = "xms.okapi.site"
     # if actual host is not the SERVER_NAME, it will response 404 for every route
     
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://okapi:43%xdR+g@mysql/okapi?charset=utf8'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://okapi:43%xdR+g@mysql/okapi?charset=utf8' 
     SQLALCHEMY_POOL_RECYCLE = 3600
     
     # for logging in __init__

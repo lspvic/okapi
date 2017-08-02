@@ -4,8 +4,10 @@ services:
         build: .
         ports:
             - "5001:5000"
-        links:
-            - mysql
+        networks:
+            network:
+                aliases:
+                    - okapi-engine
         environment:
             - okapi_config=okapi.config.RemoteDevConfig
         volumes:
@@ -16,6 +18,10 @@ services:
     mysql:
         image: mysql
         command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
+        networks:
+            network:
+                aliases:
+                    - mysql
         volumes:
             - db-data:/var/lib/mysql
         environment:
@@ -24,7 +30,13 @@ services:
             - MYSQL_USER=okapi
             - MYSQL_PASSWORD=43%xdR+g
             - MYSQL_DATABASE=okapi
-
+    image-py:
+        build: ./runtime/py
+        image: okapi/okapi-py
+        command: ["echo", "'only for build image'"]
 volumes:
     db-data: {}
     log-data: {}
+    
+networks:
+    network:

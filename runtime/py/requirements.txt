@@ -1,0 +1,5 @@
+easydict
+werkzeug
+thriftpy
+tornado
+requests_oauthlib

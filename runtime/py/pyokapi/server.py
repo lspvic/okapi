@@ -7,19 +7,25 @@ import traceback
 import threading
 import json
 import time
+import logging
 from datetime import timedelta
+
+import requests
 from werkzeug.routing import Map, Rule, RequestRedirect, BuildError
 from werkzeug.exceptions import HTTPException
-
 from thriftpy.rpc import make_server
 from easydict import EasyDict as edict
+from requests_oauthlib import OAuth2Session
+from oauthlib.oauth2 import LegacyApplicationClient, BackendApplicationClient
 
-from tornado import gen, ioloop
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = "true"
+
 import pyokapi
-from pyokapi import client, api, okapi_thrift
+from pyokapi import okapi_thrift
 from thriftpy.transport import TFramedTransportFactory
 bin_path = os.environ.get("BIN_PATH", "/home/okapi/bin")
 
+api = threading.local()
 url_map = Map()
 view_functions = {}
 
@@ -36,6 +42,7 @@ def _decorator(method):
 
 for m in ['get', 'post', 'put', 'delete']:
     setattr(pyokapi, m, _decorator(m))
+setattr(pyokapi, "api", api)
 
 def _endpoint_from_view_func(view_func):
     """Internal helper that returns the default endpoint for a given
@@ -109,7 +116,7 @@ class Dispatcher(object):
             api.args = arg = edict(arg if arg else {})
             api.headers = headers = edict(headers if headers else {})
             
-            print("invoke %s, service path: %s, method: %s" % (api_id, api_path, method))
+            print("service path: %s, method: %s" % (api_path, method))
             print("arg: %s, headers: %s" % (arg, headers))
              
             if headers.get("Content-Type", '') == "application/json":
@@ -174,9 +181,15 @@ class Dispatcher(object):
         
         return okapi_thrift.Response(code = status, body = body, headers = headers)
 
-def serve_forever(runtime, port):  
-    import_module(runtime)
+def serve_forever(runtime, port, client):
     try:
+        api_details = import_module(runtime.entrypoint)
+        r = client.post("http://okapi-engine:5000/okapi/service/v1/%s/%s/spec" % (runtime.service_name, runtime.service_version), json = api_details)
+        logging.debug("post service spec status: %s" % r.status_code)
+    except:
+        traceback.print_exc()
+    try:
+        logging.info("start to serve on port %s" % port)
         server = make_server(okapi_thrift.InvokeService, Dispatcher(), '0.0.0.0', port, trans_factory=TFramedTransportFactory())
         server.serve()
     except Exception as e:
@@ -189,33 +202,55 @@ def import_module(name):
     for rule in url_map.iter_rules():
         ms = rule.methods - set(["OPTIONS", "HEAD"])
         api_details.append({'rule': rule.rule, 'methods': list(ms), 'function': rule.endpoint})
+    logging.debug("getting service api specs: %s" % api_details)
     return api_details
         
-def deploy(runtime):
-    r = client.get("/okapi/service/v1/%s/%s/binary" % (service_id, version))
-    path = "%s/%s/" % (bin_path, service_id)
+def deploy(runtime, client):
+    try:
+        r = client.get("http://okapi-engine:5000/okapi/service/v1/%s/%s/binary" % 
+            (runtime.service_name, runtime.service_version)
+        )
+    except:
+        logging.debug("request error", exc_info = True)
+    if not r.ok:
+        raise
+    path = "%s/%s/" % (bin_path, runtime.service_name)
     from tempfile import NamedTemporaryFile
-    import zipfile
+    import  zipfile
     with NamedTemporaryFile('wb') as f:
-        f.write(r.stream.read())
+        f.write(r.content)
         f.flush()
         z = zipfile.ZipFile(f.name)
         z.extractall(path)
         z.close()
     sys.path.insert(0, path)
-    import_module()
     
 if __name__ == '__main__':
     
-    import argparse
-    parser = argparse.ArgumentParser(description="")
-    parser.add_argument("action", help="")
-    parser.add_argument("name", help="")
-    parser.add_argument("version", help="")
-    parser.add_argument("port", help="")
-    args = parser.parse_args()
-    runtime = client.get("")
-    if args.action == "deploy":
-        deploy(runtime)
-    elif args.action == "serve":
-        serve_forever(runtime, port)
+    username = os.environ.get("OKAPI_USER_NAME", None)
+    service_name = os.environ.get("OKAPI_SERVICE_NAME", None)
+    service_version = os.environ.get("OKAPI_SERVICE_VERSION", None)
+    port = int(os.environ.get("OKAPI_DEPLOY_PORT", 23241))
+    entrypoint = os.environ.get("OKAPI_ENTRYPOINT", None)
+    client_id = os.environ.get("OKAPI_CLIENT_ID", None)
+    client_secret = os.environ.get("OKAPI_CLIENT_SECRET", None)
+    
+    runtime = edict(username = username,
+        service_name = service_name,
+        service_version = service_version,
+        entrypoint = entrypoint,
+        client_id = client_id,
+        client_secret = client_secret,
+    )
+    
+    token_url = "http://okapi-engine:5000" + "/okapi/oauth2/v1/token"
+    client = OAuth2Session(client = BackendApplicationClient(client_id = client_id))
+    client.mount('http://', 
+        requests.adapters.HTTPAdapter(max_retries=2, pool_connections=1, pool_maxsize=1)
+    )
+
+    client.headers.update({"Connection": "close"})
+    client.fetch_token(token_url, client_id = client_id, client_secret = client_secret)
+        
+    deploy(runtime, client)
+    serve_forever(runtime, port, client)

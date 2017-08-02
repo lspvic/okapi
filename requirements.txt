@@ -4,3 +4,4 @@ PyMySQL
 flask_oauthlib
 docker
 uwsgi
+thriftpy

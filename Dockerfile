@@ -8,12 +8,15 @@ RUN groupadd okapi && \
 ENV APP_DIR /var/www/app
 RUN mkdir -p $APP_DIR
 WORKDIR $APP_DIR
-COPY . $APP_DIR
 
+COPY requirements.txt $APP_DIR
 RUN mkdir -p "$HOME/.pip/" && \
     echo "[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple" > "$HOME/.pip/pip.conf" && \
-    pip install -r requirements.txt && \
-    rm requirements.txt && \
+    pip install -r requirements.txt 
+
+COPY . $APP_DIR
+
+RUN  rm requirements.txt && \
     mkdir -p /var/log/ && \
     chmod +x wait-for-it.sh
 

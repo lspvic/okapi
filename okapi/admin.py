@@ -17,7 +17,7 @@ def create_user():
         tel = info.get("tel", None),
         password = info["password"]
     )
-    app.logger.debug("add user %r to db" % user)
+    app.logger.debug("create new user %r" % user)
     db.session.add(user)
     db.session.commit()
     return "", 201
@@ -29,6 +29,7 @@ def delete_user(username):
     if user:
         if user.username == request.oauth.user.username:
             return "you cannot delete your account", 403
+        app.logger.debug("delete user %r" % user)
         db.session.delete(user)
         db.session.commit()
         return "", 201
@@ -41,7 +42,8 @@ def set_admin(username):
     if user:
         if user.username == request.oauth.user.username:
             return "you cannot change your admin status", 403
-        user.is_admin = request.json["admin"]
+        user.is_admin = request.json["admin"]        
+        app.logger.debug("set %r admin: %s" % (user, user.is_admin))
         db.session.commit()
         return "", 201
     return "user not found", 404

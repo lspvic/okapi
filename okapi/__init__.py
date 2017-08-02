@@ -22,10 +22,7 @@ app.register_blueprint(service_mod, url_prefix='/okapi/service/v1')
 app.register_blueprint(admin_mod, url_prefix='/okapi/admin/v1')
 app.register_blueprint(dummy_mod, url_prefix='/okapi/dummy/v1')
 
-@app.route("/<username>/<service>/<version>/<path:path>")
-@oauth.require_oauth()
-def api_handler(username, service, version, path):
-    return 'unimplemented'
+from .gateway import okapi_thrift
 
 @app.route("/")
 def list():

@@ -137,7 +137,10 @@ class Service(db.Model):
     description = db.Column(db.Text, nullable = False)
     tags = db.Column(db.Text, default = "")
     
-class ServiceVersion(db.Model):
+    def __repr__(self):
+        return "Service(name=%s, User=%s)" % (self.name, self.user)
+    
+class Runtime(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     service_name = db.Column(
         db.String(40),
@@ -156,6 +159,13 @@ class ServiceVersion(db.Model):
     update_time = db.Column(db.Integer, nullable = False, default = lambda :int(time.time()))
     entrypoint = db.Column(db.String(256), nullable = False)
     obsolete = db.Column(db.Boolean(), default = False, nullable = False)
+    
+    @property
+    def full_name(self):
+        return "%s_%s_%s" % (self.username, self.service_name, self.version)
+        
+    def __repr(self):
+        return self.full_name
     
     def to_dict(self):
         return {

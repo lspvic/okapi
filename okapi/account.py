@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 from oauthlib.common import generate_token
 
-from . import db
+from . import app, db
 from .oauth2 import oauth, Client
 
 mod = Blueprint("user", __name__)
@@ -51,6 +51,7 @@ def client_id():
             _default_scope = 'api', 
             _allowed_grant_types = 'client_credentials',
             client_type = 'confidential')
+        app.logger.debug("%r api client id changed: %s" % (user, client.client_id))
         db.session.add(client)
         db.session.commit()
     return jsonify(client_id = client.client_id)

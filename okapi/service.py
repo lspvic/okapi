@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify, make_response, send_file
 
 from . import app, db
 from .oauth2 import oauth
-from .models import Service, ServiceVersion
+from .models import Service, Runtime
 from .tasks import start_service
 
 binary_path = "/var/lib/okapi/binary"
@@ -34,6 +34,7 @@ def create():
     if service:
         return "service already exists", 405
     service = Service(user_id=request.oauth.user.id, **data)
+    app.logger.debug("create new service: %r" % service)
     db.session.add(service)
     db.session.commit()
     return "", 201   
@@ -58,12 +59,20 @@ def add(id):
         db.session.commit()
         return "", 201
 
-
+@mod.route("/<id>/<version>/spec", methods=['GET', 'POST'])
+@oauth.require_oauth('manage')
+def spec(id, version):
+    if request.method == 'POST':
+        app.logger.debug("api(%s-%s) spec uploaded: %s" % (id, version, request.json))
+        return "success"
+    else:
+        return jsonify(msg="unimplemented"), 403
+        
 @mod.route("/<id>/<version>/binary", methods = ['GET', 'POST'])    
 @oauth.require_oauth('manage')
 def upload(id, version):
     username = request.oauth.user.username
-    service_version = ServiceVersion.query.filter_by(
+    service_version = Runtime.query.filter_by(
         username = username,
         service_name = id,
         version = version
@@ -76,6 +85,7 @@ def upload(id, version):
     if request.method == "POST":
         with open(name, "wb") as f:
             f.write(request.stream.read())
+        app.logger.debug("Runtime %r binary file uploaded" % service_version)
         start_service(service_version)
         return "success", 201
     else:
@@ -86,7 +96,7 @@ def upload(id, version):
 @oauth.require_oauth('manage')
 def update(id):
     username = request.oauth.user.username
-    count = ServiceVersion.query.filter_by(
+    count = Runtime.query.filter_by(
         username = username,
         service_name = id).count()
     data = request.json
@@ -96,10 +106,11 @@ def update(id):
         return "runtime not supported", 405
     entrypoint = data["entrypoint"]
     version = "v%s" % (count+1)
-    service_version = ServiceVersion(
+    service_version = Runtime(
         username=username, service_name=id,
         notes=notes, runtime=runtime, 
         version=version, entrypoint=entrypoint)
+    app.logger.debug("Service updated, create new Runtime: %r" % service_version)
     db.session.add(service_version)
     db.session.commit()
     return jsonify(**service_version.to_dict()), 201
@@ -107,7 +118,7 @@ def update(id):
 @mod.route("/<id>/<version>",methods=['GET', 'PUT'])
 @oauth.require_oauth('manage')
 def update_info(id, version):
-    service_version = ServiceVersion.query.filter_by(
+    service_version = Runtime.query.filter_by(
         username = request.oauth.user.username,
         service_name = id,
         version = version
@@ -121,7 +132,7 @@ def update_info(id, version):
         if 'runtime' in data:
             runtime = data["runtime"]
             if runtime not in ("py2", "py3", "java", "forward"):
-                return "runtime not supported", 405   
+                return "runtime not supported", 405
             service_version.runtime = runtime
         for attr in ('notes', 'entrypoint'):
             if attr in data:
